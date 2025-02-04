@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+	<metadata>
+		<id>OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64</id>
+		<version>2.88.8</version>
+		<authors>Microsoft,OnceMi</authors>
+		<owners>OnceMi</owners>
+		<requireLicenseAcceptance>true</requireLicenseAcceptance>
+		<license type="file">LICENSE</license>
+		<readme>README.md</readme>
+		<!--<icon>Logo.png</icon>-->
+		<description>SkiaSharp Native libraries for linux-loongarch64</description>
+	</metadata>
+	<files>
+		<file src="runtimes\linux-loongarch64\native\ABI1.0\libSkiaSharp.so" target="runtimes\linux-loongarch64\native\ABI1.0\libSkiaSharp.so" />
+		<file src="runtimes\linux-loongarch64\native\libSkiaSharp.so" target="runtimes\linux-loongarch64\native\libSkiaSharp.so" />
+
+		<file src="..\..\LICENSE" target="LICENSE" />
+		<file src="..\..\README.md" target="README.md" />
+	</files>
+</package>
