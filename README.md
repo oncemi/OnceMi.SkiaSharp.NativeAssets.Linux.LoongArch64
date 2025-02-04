@@ -1,5 +1,5 @@
 # OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64
-Runtime for SkiaSharp on the LoongArch64 New World platform.  
+Runtime for SkiaSharp on the LoongArch64 ABI2.0(New World) platform.  
 (在官方没有提供原生支持之前的临时解决方案，暂不支持SkiaSharp3.x版本)  
 
 ### How to use?  
