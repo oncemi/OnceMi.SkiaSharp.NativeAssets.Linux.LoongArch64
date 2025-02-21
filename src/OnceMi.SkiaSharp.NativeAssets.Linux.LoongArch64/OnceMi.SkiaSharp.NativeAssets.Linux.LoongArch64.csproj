@@ -7,9 +7,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Compile Remove="build\**" />
-		<EmbeddedResource Remove="build\**" />
-		<None Remove="build\**" />
+	  <Compile Remove="publish\**" />
+	  <EmbeddedResource Remove="publish\**" />
+	  <None Remove="publish\**" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -24,6 +24,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<None Update="build\OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64.targets">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 		<None Update="runtimes\linux-loongarch64\native\ABI1.0\libSkiaSharp.so">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>

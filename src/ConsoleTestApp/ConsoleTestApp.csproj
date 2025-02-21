@@ -1,17 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFrameworks Condition="'$(NET9ONLY)' != 'True'">net8.0</TargetFrameworks>
+		<TargetFramework Condition="'$(NET9ONLY)' == 'True'">net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64" Version="2.88.8" />
-    <PackageReference Include="SkiaSharp" Version="2.88.8" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.8" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="2.88.8" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Update="runtimes\**\native\**\*.*">
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-loongarch64'">
+		<PackageReference Include="SkiaSharp" Version="2.88.9" />
+		<PackageReference Include="OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64" Version="2.88.9" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(RuntimeIdentifier)' != 'linux-loongarch64'">
+		<PackageReference Include="SkiaSharp" Version="2.88.9" />
+		<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" />
+		<PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="2.88.9" />
+	</ItemGroup>
 
 </Project>

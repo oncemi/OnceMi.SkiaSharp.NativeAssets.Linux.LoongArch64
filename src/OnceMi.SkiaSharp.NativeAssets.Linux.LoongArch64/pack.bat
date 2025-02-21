@@ -2,7 +2,7 @@
 
 :: 设置包生成配置
 set configuration=Release
-set output=build
+set output=publish
 
 dotnet pack "OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64.csproj" ^
     -p:NuspecFile="OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64.nuspec" ^

@@ -1,12 +1,34 @@
 # OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64
-Runtime for SkiaSharp on the LoongArch64 ABI2.0(New World) platform.  
+Runtime for SkiaSharp on the LoongArch64 platform. (Support ABI1.0 and ABI2.0)  
 (在官方没有提供原生支持之前的临时解决方案，暂不支持SkiaSharp3.x版本)  
 
 ### How to use?  
-Install package from nuget：`OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64`  
+1. Install package from nuget：`OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64`  
+2. Load Skia native library  
+	```
+	static void LoadSkiaNativeLibrary()
+	{
+		if (RuntimeInformation.ProcessArchitecture == Architecture.LoongArch64 && RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+		{
+			string libraryPath = RuntimeInformationHelper.IsABI1()
+				? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "./runtimes/linux-loongarch64/native/ABI1.0/libSkiaSharp.so")
+				: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "./runtimes/linux-loongarch64/native/libSkiaSharp.so");
+			if (!File.Exists(libraryPath))
+			{
+				return;
+			}
+			IntPtr ptr = NativeLibrary.Load(libraryPath);
+			if (ptr == IntPtr.Zero)
+			{
+				throw new BadImageFormatException($"Can not load native library {libraryPath}.");
+			}
+		}
+	}
+	```
+	Full demo please visit: https://github.com/oncemi/OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64/blob/main/src/ConsoleTestApp/Program.cs  
 
-Tips:  
-使用本包，请勿配置龙芯社区nuget源，在引用了`SkiaSharp.NativeAssets.Linux`的情况下，可能会和本包相互覆盖。  
+	Tips:  
+	使用本包，请勿配置龙芯社区nuget源，在引用了`SkiaSharp.NativeAssets.Linux`的情况下，可能会和本包相互覆盖。  
 
 ### LoongArch64 新世界 编译skia  
 1. 安装依赖  
@@ -89,7 +111,7 @@ Tips:
 
 
 
-参考资料：  
+### 参考资料：  
 
 [https://github.com/mono/SkiaSharp/blob/main/native/linux/build.cake#L112](https://github.com/mono/SkiaSharp/blob/main/native/linux/build.cake#L112)  
 

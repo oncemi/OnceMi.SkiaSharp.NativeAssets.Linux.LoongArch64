@@ -1,268 +1,272 @@
-# ---------------------
-# 配置参数
-# ---------------------
 
 param (
-    [string]$SolutionPath = "./src/OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64.sln",  # .sln 文件的相对路径，请根据需要修改
+    [string]$BuildTarget = "./ConsoleTestApp/ConsoleTestApp.csproj",
+    [string]$SourceePath = "./src",
+    [string]$ProjectName = "ConsoleTestApp",
     [string]$RemoteUser = "loong",
     [string]$RemoteHost = "192.168.188.25",
+    [string]$RemoteRootPath = "/home/$RemoteUser/Projects/CSharpProject",
     [int]$RemotePort = 22,
-    [string]$RemoteProjectPath = "/home/loong/Projects/CSharpProject/src",
-    [switch]$UsePassword,  # 如果不使用密码认证，可以去掉这个开关
-    [string]$ZipFileName = "CSharpProject.zip",
-    [string]$BuildConfiguration = "Release"
+    [switch]$UsePassword,
+    [string]$BuildConfiguration = "Release",
+    [string]$RuntimeIdentifier="linux-loongarch64",
+    [int]$RetryCount = 3
 )
 
 # ---------------------
-# 导入必要的模块
+# 初始化环境
 # ---------------------
+$scriptDirectory = $PSScriptRoot
+$logFilePath = Join-Path $scriptDirectory "build_log.log"
+$RemoteProjectPath = "$RemoteRootPath/$ProjectName"
 
-# 导入 Posh-SSH 模块，如果尚未安装则安装它
-if (!(Get-Module -ListAvailable -Name Posh-SSH)) {
-    Write-Output "安装 Posh-SSH 模块..."
-    Install-Module -Name Posh-SSH -Force -Scope CurrentUser
-}
-Import-Module Posh-SSH
+$global:ErrorActionPreference = 'Stop'
 
-# 获取脚本所在目录作为项目根目录
-$scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Definition
-Set-Location $scriptDirectory
-
-# 验证 .sln 文件是否存在
-if (-Not (Test-Path $SolutionPath)) {
-    Write-Error "无法找到指定的解决方案文件：$SolutionPath"
-    exit 1
-}
-
-# 获取项目目录路径（假设 .sln 文件位于项目根目录）
-$localProjectPath = $scriptDirectory
-
-# 认证方式
-if ($UsePassword) {
-    # 提示输入密码（安全处理）
-    $password = Read-Host -Prompt "请输入远程主机的密码" -AsSecureString
-    $credential = New-Object System.Management.Automation.PSCredential ($RemoteUser, $password)
-} else {
-    # 使用密钥认证
-    # 请确保本地 SSH 密钥已配置，并且远程主机接受密钥认证
-    $credential = Get-Credential -UserName $RemoteUser -Message "使用密钥认证，请确保配置了 SSH 密钥对。"
-}
-
-# 日志文件路径
-$logFilePath = Join-Path -Path $scriptDirectory -ChildPath "build_log.txt"
-
-# 清空或创建日志文件
-New-Item -Path $logFilePath -ItemType File -Force | Out-Null
-
+# ---------------------
+# 日志函数（支持颜色和日志分级）
+# ---------------------
 function Write-Log {
-    param (
+    param(
+        [Parameter(Mandatory=$true)]
         [string]$Message,
-        [string]$Level = "INFO",
-        [switch]$NoConsole
+        
+        [ValidateSet('INFO','WARN','ERROR','SUCCESS')]
+        [string]$Level = 'INFO',
+        
+        [switch]$NoNewLine
     )
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logMessage = "$timestamp [$Level] : $Message"
-    if (-not $NoConsole) {
-        Write-Output $logMessage
+
+    $colorMap = @{
+        'INFO'    = 'White'
+        'WARN'    = 'Yellow'
+        'ERROR'   = 'Red'
+        'SUCCESS' = 'Green'
     }
-    Add-Content -Path $logFilePath -Value $logMessage
+
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+    $logEntry = "$timestamp [$Level] $Message"
+    
+    # 控制台输出带颜色
+    if ($Host.UI.RawUI) {
+        $originalColor = $Host.UI.RawUI.ForegroundColor
+        $Host.UI.RawUI.ForegroundColor = $colorMap[$Level]
+        if ($NoNewLine) { Write-Host $logEntry -NoNewline }
+        else { Write-Host $logEntry }
+        $Host.UI.RawUI.ForegroundColor = $originalColor
+    }
+    else {
+        Write-Output $logEntry
+    }
+
+    # 写入日志文件
+    Add-Content -Path $logFilePath -Value $logEntry
 }
 
 # ---------------------
-# 处理 tmp 文件夹
+# 功能函数
 # ---------------------
+function Invoke-WithRetry {
+    param(
+        [scriptblock]$ScriptBlock,
+        [int]$MaxRetries = 3,
+        [int]$RetryDelay = 2
+    )
 
-$tmpDirectory = Join-Path -Path $scriptDirectory -ChildPath "tmp"
+    $attempt = 1
+    do {
+        try {
+            return & $ScriptBlock
+        }
+        catch {
+            if ($attempt -gt $MaxRetries) {
+                Write-Log "操作在 $MaxRetries 次重试后失败" -Level ERROR
+                throw
+            }
+            
+            Write-Log "操作失败 (尝试 $attempt/$MaxRetries): $_" -Level WARN
+            Start-Sleep -Seconds ($RetryDelay * $attempt)
+            $attempt++
+        }
+    } while ($true)
+}
 
-if (Test-Path $tmpDirectory) {
-    Write-Log "检测到已存在的 tmp 文件夹，将进行删除..." "INFO"  -NoConsole
+# ---------------------
+# 主程序逻辑
+# ---------------------
+try {
+    # 模块管理
+    if (!(Get-Module -ListAvailable -Name Posh-SSH)) {
+        Write-Log "安装 Posh-SSH 模块..." -Level INFO
+        Install-Module -Name Posh-SSH -Force -Scope CurrentUser -SkipPublisherCheck
+    }
+    Import-Module Posh-SSH
+
+    Get-SSHTrustedHost | Remove-SSHTrustedHost | Out-Null
+
+    # 准备临时目录
+    $zipFileName="$ProjectName.zip"
+    $tmpDirectory = Join-Path $scriptDirectory "tmp"
+    $zipFilePath = Join-Path $tmpDirectory $zipFileName
+
+    # 创建干净的临时目录
+    Invoke-WithRetry -ScriptBlock {
+        New-Item -Path $tmpDirectory -ItemType Directory -Force | Out-Null
+        Write-Log "临时目录创建成功: $tmpDirectory" -Level SUCCESS
+    }
+
+    # 智能项目打包
+    Write-Log "开始项目打包（排除开发目录）..." -Level INFO
+    $stagingDir = Join-Path $tmpDirectory "staging"
+    
     try {
-        Remove-Item -Path $tmpDirectory -Recurse -Force
-        Write-Log "已删除现有的 tmp 文件夹：$tmpDirectory" "INFO"  -NoConsole
+        # 使用 robocopy 进行高效复制和排除
+        $excludeDirs = @('bin', 'obj', '.vs', '.git', 'tmp', 'packages')
+        $robocopyArgs = @($SourceePath, $stagingDir, '/MIR', '/NFL', '/NDL', '/NJH', '/NJS', "/XD", $excludeDirs)
+        $robocopyLog = robocopy @robocopyArgs 2>&1
+        
+        if ($LASTEXITCODE -ge 8) {
+            throw "文件复制失败 (ExitCode: $LASTEXITCODE)"
+        }
+        
+        Write-Log "项目文件准备完成，有效文件数: $((Get-ChildItem $stagingDir -Recurse | Measure-Object).Count)" -Level SUCCESS
+    }
+    catch {
+        Write-Log "项目打包失败: $_" -Level ERROR
+        throw
+    }
+
+    # 创建压缩包
+    Invoke-WithRetry -ScriptBlock {
+        Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipFilePath -CompressionLevel Optimal
+        Write-Log "压缩包创建成功，大小: $('{0:N2} MB' -f ((Get-Item $zipFilePath).Length/1MB))" -Level SUCCESS
+    }
+
+    # SSH 认证
+    if ($UsePassword) {
+        $credential = Get-Credential -UserName $RemoteUser -Message "请输入远程主机密码"
+    }
+    else {
+        $credential = New-Object System.Management.Automation.PSCredential (
+            $RemoteUser,
+            (New-Object System.Security.SecureString)
+        )
+    }
+
+    # SSH 连接管理
+    try {
+        Write-Log "正在建立SSH连接 [$RemoteHost]:$RemotePort..." -Level INFO
+        $session = New-SSHSession -ComputerName $RemoteHost -Port $RemotePort -Credential $credential -AcceptKey -ConnectionTimeout 30 
+    
+        if (-not $session.Connected) {
+            throw "SSH连接失败"
+        }
+        Write-Log "SSH连接成功" -Level SUCCESS
     } catch {
-        Write-Log "无法删除 tmp 文件夹：$_" "ERROR"
+        Write-Log "无法建立 SSH 会话：$_" "ERROR"
         exit 1
     }
-}
 
-# 创建 tmp 文件夹
-try {
-    New-Item -Path $tmpDirectory -ItemType Directory -Force | Out-Null
-    Write-Log "已创建 tmp 文件夹：$tmpDirectory" "INFO"  -NoConsole
-} catch {
-    Write-Log "无法创建 tmp 文件夹：$_" "ERROR"
-    exit 1
-}
+    # 远程操作
+    try {
+        # 环境检查
+        $requiredTools = @('unzip', 'dotnet')
+        foreach ($tool in $requiredTools) {
+            $checkResult = Invoke-SSHCommand -SessionId $session.SessionId -Command "command -v $tool"
+            if ($checkResult.ExitStatus -ne 0) {
+                throw "缺少必要工具: $tool"
+            }
+        }
 
-# 压缩包路径调整为 tmp 文件夹内
-$zipFilePath = Join-Path -Path $tmpDirectory -ChildPath $ZipFileName
+        # 检查、删除或创建远程目录
+        $checkDirCmd = "if [ -d '$RemoteProjectPath' ]; then echo 'exists'; else echo 'not_exists'; fi"
+        $checkDirResult = Invoke-SSHCommand -SessionId $session.SessionId -Command $checkDirCmd
 
-# ---------------------
-# 压缩本地项目
-# ---------------------
-Write-Log "压缩本地项目..." -NoConsole
-try {
-    if (Test-Path $zipFilePath) {
-        Remove-Item $zipFilePath -Force
-        Write-Log "已删除旧的压缩包：$zipFilePath"
+        if ($checkDirResult.Output[0] -eq 'exists') {
+            $removeDirCmd = "rm -rf '$RemoteProjectPath'"
+            Invoke-SSHCommand -SessionId $session.SessionId -Command $removeDirCmd | Out-Null
+        }
+        $createDirCmd = "mkdir -p '$RemoteProjectPath'"
+        Invoke-SSHCommand -SessionId $session.SessionId -Command $createDirCmd | Out-Null
+
+        # 文件传输
+        Invoke-WithRetry -ScriptBlock {
+            Write-Log "开始安全文件传输..." -Level INFO
+            Set-SCPItem -ComputerName $RemoteHost -Port $RemotePort -Credential $credential `
+                        -Path $zipFilePath -Destination $RemoteRootPath -Verbose
+            Write-Log "文件传输完成" -Level SUCCESS
+        }
+
+        # 获取远程已安装的 SDK 版本
+        $sdkListResult = Invoke-SSHCommand -SessionId $session.SessionId -Command "dotnet --list-sdks"
+        $installedSdks = $sdkListResult.Output | ForEach-Object { 
+            ($_.Trim() -replace '\s+.*') -replace '^(\d+\.\d+).*', '$1'
+        }
+
+        if ($installedSdks.Count -gt 0) {
+            # 选择 SDK 版本 (如果有多个，选择最新的主次版本)
+            $selectedSdkVersion = $installedSdks | Sort-Object -Descending | Select-Object -First 1
+            Write-Log "远程已安装的 .NET SDK 版本: $($installedSdks -join ', ')" -Level INFO
+            Write-Log "将使用 .NET SDK 版本: $selectedSdkVersion" -Level INFO
+        }
+        else {
+            Write-Log "远程未找到已安装的 .NET SDK。" -Level ERROR
+            throw "远程未找到已安装的 .NET SDK。"
+        }
+
+        # 设置不同版本的参数
+        if (($installedSdks.Count -eq 1) -and ($selectedSdkVersion -eq "9.0")) {
+            $selectedSdkParam = "-p:NET9ONLY=True"
+        }
+        if (($installedSdks.Count -eq 1) -and ($selectedSdkVersion -eq "8.0")) {
+            $selectedSdkParam = "-p:NET8ONLY=True"
+        }
+        if (($installedSdks.Count -eq 1) -and ($selectedSdkVersion -eq "7.0")) {
+            $selectedSdkParam = "-p:NET7ONLY=True"
+        }
+        if (($installedSdks.Count -eq 1) -and ($selectedSdkVersion -eq "6.0")) {
+            $selectedSdkParam = "-p:NET6ONLY=True"
+        }
+
+        # 远程解压和构建（新增版本检测逻辑）
+        $remoteCommands = @(
+            "cd $RemoteRootPath",
+            "unzip -q -d $RemoteProjectPath -o $zipFileName",
+            "rm -f $zipFileName",
+            "cd $RemoteProjectPath"
+            "dotnet build `"$BuildTarget`" --configuration $BuildConfiguration -p:RuntimeIdentifier=$RuntimeIdentifier -p:TargetFramework=net$selectedSdkVersion $selectedSdkParam"
+        )
+
+        Write-Log "开始构建 $BuildTarget" -Level INFO
+        Write-Log $remoteCommands[4] -Level INFO
+       
+        $commandResult = Invoke-SSHCommand -SessionId $session.SessionId -Command ($remoteCommands -join ' && ')        
+        if ($commandResult.ExitStatus -ne 0) {
+            throw "远程构建失败: $($commandResult.Error)"
+        }
+        
+        Write-Log "远程构建成功! 输出信息:....`n$($commandResult.Output[-5..-1] -join "`n")" -Level SUCCESS
     }
-    Compress-Archive -Path "$localProjectPath\src\*" -DestinationPath $zipFilePath -Force
-    Write-Log "项目已成功压缩到 $zipFilePath" -NoConsole
-} catch {
-    Write-Log "压缩项目失败：$_" "ERROR"
-    exit 1
-}
-
-# ---------------------
-# 建立 SSH 会话
-# ---------------------
-Write-Log "尝试建立到 $RemoteHost 的 SSH 连接..." -NoConsole
-try {
-    $session = New-SSHSession -ComputerName $RemoteHost -Port $RemotePort -Credential $credential -AcceptKey -ErrorAction Stop
-    Write-Log "SSH 会话已成功建立。" -NoConsole
-} catch {
-    Write-Log "无法建立 SSH 会话：$_" "ERROR"
-    exit 1
-}
-
-# ---------------------
-# 检查远程环境
-# ---------------------
-Write-Log "检查远程主机的必要工具..." -NoConsole
-
-$requiredCommands = @("unzip", "dotnet")
-
-foreach ($cmd in $requiredCommands) {
-    $checkCmd = "which $cmd"
-    $result = Invoke-SSHCommand -SessionId $session.SessionId -Command $checkCmd
-    if ($result.Output.Trim() -eq "") {
-        Write-Log "远程主机缺少必要工具：$cmd" "ERROR"
-        Remove-SSHSession -SessionId $session.SessionId
-        exit 1
-    } else {
-        Write-Log "远程主机已安装 $cmd" -NoConsole
+    finally {
+        if ($session.Connected) {
+            Remove-SSHSession -SessionId $session.SessionId | Out-Null
+            Write-Log "SSH连接已安全关闭" -Level INFO
+        }
     }
 }
-
-# ---------------------
-# 创建远程目录
-# ---------------------
-Write-Log "在远程主机上创建项目目录：$RemoteProjectPath" -NoConsole
-$mkdirCommand = "mkdir -p $RemoteProjectPath"
-$mkdirResult = Invoke-SSHCommand -SessionId $session.SessionId -Command $mkdirCommand
-if ($mkdirResult.ExitStatus -ne 0) {
-    Write-Log "创建远程目录失败：$($mkdirResult.Error)" "ERROR"
-    Remove-SSHSession -SessionId $session.SessionId
-    exit 1
-} else {
-    Write-Log "远程目录已创建或已存在。" -NoConsole
-}
-
-# 清理远程目录中的旧文件
-Write-Log "清理远程项目目录中的旧文件..." -NoConsole
-$cleanupCommand = "rm -rf $RemoteProjectPath/*"
-$cleanupResult = Invoke-SSHCommand -SessionId $session.SessionId -Command $cleanupCommand
-if ($cleanupResult.ExitStatus -ne 0) {
-    Write-Log "清理远程目录失败：$($cleanupResult.Error)" "ERROR"
-    Remove-SSHSession -SessionId $session.SessionId
-    exit 1
-} else {
-    Write-Log "远程目录已清理。" -NoConsole
-}
-
-# ---------------------
-# 上传压缩包
-# ---------------------
-Write-Log "上传项目到远程主机..."
-try {
-    Set-SCPItem -ComputerName $RemoteHost -Port $RemotePort -Credential $credential -AcceptKey -Path $zipFilePath -Destination $RemoteProjectPath
-    Write-Log "压缩包已上传。"
-} catch {
-    Write-Log "上传压缩包失败：$_" "ERROR"
-    Remove-SSHSession -SessionId $session.SessionId
+catch {
+    Write-Log "$_" -Level ERROR
     exit 1
 }
-
-# ---------------------
-# 解压缩远程文件
-# ---------------------
-Write-Log "在远程主机上解压缩项目文件..." -NoConsole
-$unzipCommand = "cd $RemoteProjectPath && unzip -o $ZipFileName && rm $ZipFileName"
-$unzipResult = Invoke-SSHCommand -SessionId $session.SessionId -Command $unzipCommand
-if ($unzipResult.ExitStatus -ne 0) {
-    Write-Log "解压缩失败：$($unzipResult.Error)" "ERROR"
-    Remove-SSHSession -SessionId $session.SessionId
-    exit 1
-} else {
-    Write-Log "项目文件已成功解压缩。" -NoConsole
+finally {
+    # 资源清理
+    if (Test-Path $tmpDirectory) {
+        try {
+            Remove-Item -Path $tmpDirectory -Recurse -Force
+            Write-Log "已清理临时资源" -Level INFO
+        }
+        catch {
+            Write-Log "临时目录清理失败: $_" -Level WARN
+        }
+    }
+    Write-Log "操作日志已保存至: $logFilePath" -Level INFO
 }
-
-# ---------------------
-# 执行远程编译
-# ---------------------
-Write-Log "开始编译项目..."
-$buildCommand = "cd $RemoteProjectPath/../ && dotnet build $SolutionPath --configuration $BuildConfiguration"
-$buildResult = Invoke-SSHCommand -SessionId $session.SessionId -Command $buildCommand
-
-Write-Log "编译输出："
-Write-Log $buildResult.Output
-
-# 检查编译是否成功
-if ($buildResult.ExitStatus -eq 0) {
-    Write-Log "编译成功。"
-} else {
-    Write-Log "编译失败。错误信息：$($buildResult.Error)" "ERROR"
-    Remove-SSHSession -SessionId $session.SessionId
-    exit 1
-}
-
-# 可选：执行单元测试或部署
-# $runTests = Read-Host -Prompt "是否在远程主机上运行单元测试？(y/N)"
-# if ($runTests -eq 'y' -or $runTests -eq 'Y') {
-    # Write-Log "在远程主机上运行单元测试..."
-    # $testCommand = "cd $RemoteProjectPath && dotnet test $SolutionPath --configuration $BuildConfiguration"
-    # $testResult = Invoke-SSHCommand -SessionId $session.SessionId -Command $testCommand
-    # Write-Log "测试输出："
-    # Write-Log $testResult.Output
-
-    # if ($testResult.ExitStatus -eq 0) {
-        # Write-Log "所有单元测试通过。"
-    # } else {
-        # Write-Log "部分单元测试失败。错误信息：$($testResult.Error)" "ERROR"
-        # Remove-SSHSession -SessionId $session.SessionId
-        # exit 1
-    # }
-# }
-
-# ---------------------
-# 可选：部署或运行应用程序
-# ---------------------
-# $deploy = Read-Host -Prompt "是否在远程主机上部署或运行应用程序？(y/N)"
-# if ($deploy -eq 'y' -or $deploy -eq 'Y') {
-    # Write-Log "在远程主机上运行应用程序..."
-    # # 根据需要自定义运行命令，例如：
-    # $runCommand = "cd $RemoteProjectPath && dotnet run --configuration $BuildConfiguration"
-    # $runResult = Invoke-SSHCommand -SessionId $session.SessionId -Command $runCommand
-    # Write-Log "应用程序输出："
-    # Write-Log $runResult.Output
-# }
-
-# ---------------------
-# 关闭 SSH 会话
-# ---------------------
-Remove-SSHSession -SessionId $session.SessionId
-Write-Log "会话已关闭。"
-
-# ---------------------
-# 清理本地压缩包
-# ---------------------
-try {
-    Remove-Item $zipFilePath -Force
-    Write-Log "本地压缩包已删除。" -NoConsole
-	Remove-Item -Path $tmpDirectory -Recurse -Force
-	Write-Log "已删除现有的 tmp 文件夹：$tmpDirectory" "INFO"  -NoConsole
-} catch {
-    Write-Log "无法删除本地压缩包：$_" "WARN"
-}
-
-Write-Log "日志请查看：$logFilePath"
