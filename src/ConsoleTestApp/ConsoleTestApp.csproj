@@ -8,15 +8,12 @@
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
 
-	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-loongarch64'">
-		<PackageReference Include="SkiaSharp" Version="2.88.9" />
-		<PackageReference Include="OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64" Version="2.88.9" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(RuntimeIdentifier)' != 'linux-loongarch64'">
-		<PackageReference Include="SkiaSharp" Version="3.116.1" />
-		<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.116.1" />
-		<PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.116.1" />
+	<ItemGroup>
+		<PackageReference Condition="'$(RuntimeIdentifier)' == 'linux-loongarch64'" Include="SkiaSharp" Version="2.88.9" />
+		<PackageReference Condition="'$(RuntimeIdentifier)' == 'linux-loongarch64'" Include="OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64" Version="2.88.9" />
+		<PackageReference Condition="'$(RuntimeIdentifier)' != 'linux-loongarch64'" Include="SkiaSharp" Version="3.116.1" />
+		<PackageReference Condition="'$(RuntimeIdentifier)' != 'linux-loongarch64'" Include="SkiaSharp.NativeAssets.Linux" Version="3.116.1" />
+		<PackageReference Condition="'$(RuntimeIdentifier)' != 'linux-loongarch64'" Include="SkiaSharp.NativeAssets.Win32" Version="3.116.1" />
 	</ItemGroup>
 
 </Project>
