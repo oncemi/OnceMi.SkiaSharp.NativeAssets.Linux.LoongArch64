@@ -8,21 +8,15 @@
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
 
-	<ItemGroup>
-		<None Update="runtimes\**\native\**\*.*">
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-		</None>
-	</ItemGroup>
-
 	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-loongarch64'">
 		<PackageReference Include="SkiaSharp" Version="2.88.9" />
 		<PackageReference Include="OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64" Version="2.88.9" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(RuntimeIdentifier)' != 'linux-loongarch64'">
-		<PackageReference Include="SkiaSharp" Version="2.88.9" />
-		<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" />
-		<PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="2.88.9" />
+		<PackageReference Include="SkiaSharp" Version="3.116.1" />
+		<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.116.1" />
+		<PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.116.1" />
 	</ItemGroup>
 
 </Project>
