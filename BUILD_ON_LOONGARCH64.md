@@ -1,4 +1,4 @@
-# LoongArch64 编译SkiaSharp
+# LoongArch64 编译 Skia
 SkiaSharp 是基于 Google Skia 图形库 ( [skia.org](https://skia.org/) ) 的 .NET 平台跨平台 2D 图形 API。它提供了全面的 2D API，可用于跨移动、服务器和桌面模型来渲染图像。
 
 目前暂不支持longarch64架构，需要自行编译依赖库。
