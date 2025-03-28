@@ -3,7 +3,9 @@ Runtime for SkiaSharp on the LoongArch64 platform. (Support ABI1.0 and ABI2.0)
 (在官方没有提供原生支持之前的临时解决方案)  
 
 ### How to use?  
-1. Install package from nuget：`OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64` [![NuGet Version](https://img.shields.io/nuget/v/OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64.svg?style=flat)](https://www.nuget.org/packages/OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64/)     
+1. Install package  
+   `OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64` [![NuGet Version](https://img.shields.io/nuget/v/OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64.svg?style=flat)](https://www.nuget.org/packages/OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64/)
+   
 2. Load Skia native library  
 	```
     internal static class LoongArch64RuntimeNativeLoader
