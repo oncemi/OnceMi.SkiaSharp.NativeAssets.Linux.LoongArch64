@@ -8,7 +8,7 @@ namespace ConsoleTestApp
     {
         static void Main(string[] args)
         {
-            LoadSkiaNativeLibrary();
+            LoongArch64RuntimeNativeLoader.LoadSkiaLibrary();
 
             int width = 600;
             int height = 600;
@@ -45,25 +45,6 @@ namespace ConsoleTestApp
             }
 
             Console.WriteLine("Image save to: output.png");
-        }
-
-        static void LoadSkiaNativeLibrary()
-        {
-            if (RuntimeInformation.ProcessArchitecture == Architecture.LoongArch64 && RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                string libraryPath = RuntimeInformationHelper.IsABI1()
-                    ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "./runtimes/linux-loongarch64/native/ABI1.0/libSkiaSharp.so")
-                    : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "./runtimes/linux-loongarch64/native/libSkiaSharp.so");
-                if (!File.Exists(libraryPath))
-                {
-                    return;
-                }
-                IntPtr ptr = NativeLibrary.Load(libraryPath);
-                if (ptr == IntPtr.Zero)
-                {
-                    throw new BadImageFormatException($"Can not load native library {libraryPath}.");
-                }
-            }
         }
     }
 }

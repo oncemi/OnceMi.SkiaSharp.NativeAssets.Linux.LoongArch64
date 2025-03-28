@@ -7,9 +7,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Compile Remove="publish\**" />
-	  <EmbeddedResource Remove="publish\**" />
-	  <None Remove="publish\**" />
+		<Compile Remove="publish\**" />
+		<EmbeddedResource Remove="publish\**" />
+		<None Remove="publish\**" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -25,12 +25,12 @@
 
 	<ItemGroup>
 		<None Update="build\OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64.targets">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="runtimes\linux-loongarch64\native\ABI1.0\libSkiaSharp.so">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Update="runtimes\linux-loongarch64\native\libSkiaSharp.so">
+		<None Condition="'$(RuntimeIdentifier)' == 'linux-loongarch64'" Update="runtimes\linux-loongarch64\native\ABI1.0\libSkiaSharp.so">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Condition="'$(RuntimeIdentifier)' == 'linux-loongarch64'" Update="runtimes\linux-loongarch64\native\libSkiaSharp.so">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>
