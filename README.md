@@ -7,7 +7,51 @@ Runtime for SkiaSharp on the LoongArch64 platform. (Support ABI1.0 and ABI2.0)
    `OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64` [![NuGet Version](https://img.shields.io/nuget/v/OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64.svg?style=flat)](https://www.nuget.org/packages/OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64/)
    
 2. Load Skia native library  
-	```
+    ```
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            LoongArch64RuntimeNativeLoader.LoadSkiaLibrary();
+
+            int width = 600;
+            int height = 600;
+
+            using (var surface = SKSurface.Create(new SKImageInfo(width, height)))
+            {
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.White);
+                var paint = new SKPaint
+                {
+                    Color = SKColors.Red,
+                    IsAntialias = true,
+                    Style = SKPaintStyle.Fill
+                };
+
+                var path = new SKPath();
+                float centerX = width / 2f;
+                float centerY = height / 2f;
+                float size = 200;
+
+                path.MoveTo(centerX, centerY - size / 2);
+                path.CubicTo(centerX - size, centerY - size * 1.5f, centerX - size, centerY + size / 2, centerX, centerY + size);
+                path.CubicTo(centerX + size, centerY + size / 2, centerX + size, centerY - size * 1.5f, centerX, centerY - size / 2);
+                path.Close();
+
+                canvas.DrawPath(path, paint);
+
+                using (var image = surface.Snapshot())
+                using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
+                {
+                    // 保存为 PNG 文件
+                    File.WriteAllBytes("output.png", data.ToArray());
+                }
+            }
+
+            Console.WriteLine("Image save to: output.png");
+        }
+    }
+    
     internal static class LoongArch64RuntimeNativeLoader
     {
         private static readonly string RuntimeDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "runtimes", "linux-loongarch64", "native");
