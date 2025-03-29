@@ -1,6 +1,10 @@
 # OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64
 Runtime for SkiaSharp on the LoongArch64 platform. (Support ABI1.0 and ABI2.0)  
-(在官方没有提供原生支持之前的临时解决方案)  
+
+PS:  
+1. 从3.119.0之后，官方已经提供LoongArch64新世界系统架构的支持（截止2025.03.29，目前还是预览版）。  
+2. 这个包3.119.0仍然提供ABI1.0和ABI2.0的支持，后续将不在提供ABI1.0的支持。请尽快切换至新世界操作系统。  
+3. 尽量不要同时安装这个包和官方包  
 
 ### How to use?  
 1. Install package  
