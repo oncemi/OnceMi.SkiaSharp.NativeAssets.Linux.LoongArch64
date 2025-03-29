@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
 	<metadata>
 		<id>OnceMi.SkiaSharp.NativeAssets.Linux.LoongArch64</id>
-		<version>3.116.1</version>
+		<version>3.119.0</version>
 		<authors>Microsoft,OnceMi</authors>
 		<owners>OnceMi</owners>
 		<requireLicenseAcceptance>true</requireLicenseAcceptance>
