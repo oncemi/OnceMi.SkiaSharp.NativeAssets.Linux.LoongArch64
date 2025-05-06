@@ -8,7 +8,7 @@ namespace ConsoleTestApp
     {
         static void Main(string[] args)
         {
-            LoongArch64RuntimeNativeLoader.LoadSkiaLibrary();
+            //LoongArch64RuntimeNativeLoader.LoadSkiaLibrary();
 
             int width = 600;
             int height = 600;
